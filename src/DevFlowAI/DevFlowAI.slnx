@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="DevFlowAI.API/DevFlowAI.API.csproj" />
+  <Project Path="DevFlowAI.Application/DevFlowAI.Application.csproj" />
+  <Project Path="DevFlowAI.Domain/DevFlowAI.Domain.csproj" />
+  <Project Path="DevFlowAI.Infrastructure/DevFlowAI.Infrastructure.csproj" />
+  <Project Path="DevFlowAI.Tests/DevFlowAI.Tests.csproj" />
+</Solution>
