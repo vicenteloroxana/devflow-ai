@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  dotnet-build:
+    name: .NET API — build & test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/DevFlowAI
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release
+
+      - name: Test
+        run: dotnet test --no-build -c Release
+
+  python-agents:
+    name: Python agents — install & smoke test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src/agents
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: src/agents/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Smoke test — app imports and starts
+        run: |
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          sleep 3
+          curl --fail http://localhost:8000/health

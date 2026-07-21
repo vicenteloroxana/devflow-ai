@@ -354,6 +354,21 @@ paket-files/
 **/__pycache__/
 *.pyc
 
+# Python virtual environments
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
 # Cake - Uncomment if you are using it
 #tools/**
 #!tools/packages.config

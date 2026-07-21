@@ -1,0 +1,51 @@
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: devflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: devflow_ai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  agents:
+    build:
+      context: ./src/agents
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      POSTGRES_URL: postgresql://devflow:${POSTGRES_PASSWORD}@postgres:5432/devflow_ai
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./src/agents:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
+  api:
+    build:
+      context: ./src/DevFlowAI
+      dockerfile: DevFlowAI.API/Dockerfile
+    ports:
+      - "5000:8080"
+    environment:
+      ConnectionStrings__Postgres: "Host=postgres;Database=devflow_ai;Username=devflow;Password=${POSTGRES_PASSWORD}"
+      Agents__BaseUrl: "http://agents:8000"
+    depends_on:
+      - postgres
+      - agents
+
+volumes:
+  postgres_data:
