@@ -36,10 +36,16 @@ devflow-ai/
 │ ├── review_agent/
 │ └── eval_agent/
 ├── specs/ ← specs técnicas del proyecto (SDD)
+│ ├── constitution/workflow.md ← PROCESO OBLIGATORIO para crear features nuevas
+│ └── features/00N-nombre/ ← briefing.md, spec.md, plan.md, tasks.md por feature
 └── tests/
 ├── DevFlowAI.Tests/ ← xUnit
 └── agents/ ← pytest + promptfoo
 ## Reglas de arquitectura — NUNCA VIOLAR
+- Toda funcionalidad nueva SIEMPRE sigue el proceso descrito en
+  `specs/constitution/workflow.md` (briefing → spec → plan → tasks →
+  gate humano → código). No se escribe código de producción para una
+  feature nueva sin haber pasado por esos 4 documentos y el gate.
 - Prompts SIEMPRE en Application/Prompts/ como templates con parámetros
 - Llamadas al LLM SIEMPRE en Infrastructure/AI/
 - Domain NO referencia Infrastructure ni agents/
