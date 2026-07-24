@@ -1,0 +1,45 @@
+description: "Evals del prompt del Spec Agent — valida estructura y determinismo"
+
+prompts:
+  - "{{requirement}}"
+
+providers:
+  - id: "file://provider.py"
+    label: "spec-agent-groq"
+    config:
+      pythonExecutable: "../../../src/agents/.venv/Scripts/python.exe"
+
+defaultTest:
+  assert:
+    - type: contains
+      value: "## Objetivo"
+    - type: contains
+      value: "## Alcance"
+    - type: contains
+      value: "## Contexto técnico"
+    - type: contains
+      value: "## Diseño propuesto"
+    - type: contains
+      value: "## Criterios de aceptación"
+    - type: contains
+      value: "## Fuera de alcance"
+
+tests:
+  - description: "Requerimiento claro y completo"
+    vars:
+      requirement: "Necesito un endpoint que liste los workflows de un usuario paginados"
+      area: "API"
+
+  - description: "Requerimiento ambiguo — debe marcar supuestos"
+    vars:
+      requirement: "Agregar validación"
+    assert:
+      - type: contains
+        value: "[SUPUESTO]"
+
+  - description: "Requerimiento con contexto y prioridad"
+    vars:
+      requirement: "Necesito cachear las respuestas del Spec Agent"
+      context: "Para reducir latencia en llamadas repetidas a Groq"
+      priority: "media"
+      area: "agents"
