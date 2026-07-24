@@ -49,7 +49,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Run unit tests
+        working-directory: .
+        env:
+          GROQ_API_KEY: "test-key-ci"
+        run: pytest tests/agents/test_spec_agent.py -v
+
       - name: Smoke test — app imports and starts
+        env:
+          GROQ_API_KEY: "test-key-ci"
         run: |
           uvicorn main:app --host 0.0.0.0 --port 8000 &
           sleep 3
