@@ -35,20 +35,52 @@ carpeta es un slug corto de la feature (ej. `001-spec-agent`).
    estructurar la conversación).
 
 2. **`spec.md`** — Claude convierte el briefing en una especificación
-   formal con 6 secciones fijas: Objetivo, Alcance, Contexto técnico,
-   Diseño propuesto, Criterios de aceptación, Fuera de alcance.
-   Cualquier ambigüedad se marca explícitamente con el prefijo
+   formal. Cualquier ambigüedad se marca explícitamente con el prefijo
    `[NEEDS CLARIFICATION]` en vez de resolverse en silencio.
+
+   **Secciones obligatorias (en este orden):**
+   - **Glosario** — términos del dominio con definición precisa.
+     Evita ambigüedad en los criterios de aceptación.
+   - **Objetivo** — qué problema resuelve. 2-3 líneas máximo.
+   - **Alcance** — Incluye / No incluye.
+   - **Contexto técnico** — dónde encaja en la arquitectura.
+   - **Diseño propuesto** — approach técnico a alto nivel (sin código).
+   - **Requirements** — uno por cada área funcional distinguible.
+     Cada requisito tiene:
+     - *Historia de usuario*: `Como [rol] quiero [acción] para [valor]`
+     - *Criterios de aceptación* en sintaxis **EARS**:
+       - `CUANDO [evento] ENTONCES el sistema DEBERÁ [comportamiento]`
+       - `MIENTRAS [estado] el sistema DEBERÁ [comportamiento]`
+       - `SI [condición no deseada] ENTONCES el sistema DEBERÁ [respuesta]`
+       - `El sistema DEBERÁ [comportamiento permanente]` (ubiquitous)
+   - **Fuera de alcance**
+   - **Supuestos** — `[NEEDS CLARIFICATION]` resueltos en el gate.
 
 3. **`plan.md`** — Claude traduce la spec en decisiones técnicas
    concretas: qué archivos se crean, qué responsabilidad tiene cada
    uno, un chequeo explícito contra las reglas de `CLAUDE.md`
    ("Constitution Check"), y los riesgos conocidos con su mitigación.
 
+   **Sección obligatoria adicional: Correctness Properties**
+   Cada property tiene la forma:
+   ```
+   ### Property N: [Nombre descriptivo]
+   *Para cualquier* [sujeto], cuando [condición],
+   el sistema [garantía verificable y testeable].
+   **Validates: Requisito X.Y**
+   ```
+   Las Correctness Properties son el puente entre los criterios de
+   aceptación (legibles por humanos) y los property-based tests
+   (verificables por máquina con `hypothesis` en Python / `FsCheck`
+   en .NET). Deben escribirse antes de las tareas de testing.
+
 4. **`tasks.md`** — Claude desglosa el plan en tareas atómicas y
    ordenadas por dependencia (Setup → Foundational → Implementación →
    Polish). Los tests se escriben antes que el código que los hace
    pasar, y deben fallar primero.
+
+   Cada tarea de test referencia explícitamente:
+   `_Valida: Requisito X.Y, Property N_`
 
 ## Los 2 gates humanos (obligatorios, no opcionales)
 
@@ -65,6 +97,48 @@ Revisión de seguridad y correctitud sobre el código ya escrito
 (hallazgos confirmados vs. descartados, con justificación). En el
 Spec Agent este gate encontró y corrigió 2 bugs reales antes de
 seguir.
+
+## Cuándo corren los tests — regla explícita
+
+El flujo distingue dos tipos de tests con comportamientos distintos:
+
+### Tests unitarios (pytest con casos fijos)
+
+| Momento | Estado esperado | Por qué |
+|---|---|---|
+| Se escriben en Fase Foundational, antes de implementar | 🔴 **Deben fallar** | Confirma que el test detecta ausencia de implementación. Un test que pasa sin código no prueba nada — es documentación, no test. |
+| CHECKPOINT (después de implementar) | 🟢 **Deben pasar** | Confirma que la implementación cumple los criterios de aceptación. |
+| Antes del PR y en CI | 🟢 **Deben pasar** | Regresión — ningún cambio futuro rompe lo que ya funcionaba. |
+
+### Property-based tests (hypothesis en Python / FsCheck en .NET)
+
+| Momento | Estado | Por qué |
+|---|---|---|
+| Se *escriben* en Fase Foundational (junto a los unitarios) | — No se ejecutan aún | Sin implementación, `hypothesis` genera contraejemplos aleatorios que producen ruido, no información útil. |
+| CHECKPOINT (después de implementar) | 🟢 **Deben pasar** | `hypothesis` genera 100+ inputs aleatorios para intentar romper cada Correctness Property. |
+| Antes del PR y en CI | 🟢 **Deben pasar** | Mayor cobertura que los unitarios — detectan casos borde que los tests fijos no cubren. |
+
+### Resumen del ciclo completo
+
+```
+[Gate 1 aprobado]
+      ↓
+Escribir tests unitarios      → 🔴 fallan (esperado y positivo)
+Escribir property-based tests → no ejecutar aún
+      ↓
+Implementar código
+      ↓
+[CHECKPOINT]
+Tests unitarios      → 🟢 deben pasar
+Property-based tests → 🟢 deben pasar (hypothesis genera casos aleatorios)
+      ↓
+[Gate 2 aprobado]
+      ↓
+Correr evals del prompt (si el agente usa LLM)
+Verificar endpoint manualmente
+      ↓
+Abrir PR → CI verde (ambos tipos de tests) → merge
+```
 
 ## Después de los gates
 Con ambos gates pasados: correr tests → correr evals del prompt (si
