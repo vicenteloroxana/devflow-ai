@@ -1,7 +1,24 @@
 # Spec Agent — Especificación Técnica
 
 > Generado a partir de `specs/features/001-spec-agent/briefing.md`.
-> Fase 2 del proyecto (SDD) — pendiente de revisión y aprobación humana.
+> Formato actualizado al estándar definido en `specs/constitution/workflow.md`
+> (EARS + Glosario + Requirements estructurados). Implementación ya completada
+> y aprobada en Gate 2.
+
+## Glosario
+
+- **Requerimiento**: texto libre en lenguaje natural escrito por un humano
+  que describe una necesidad de software. Input del Spec Agent.
+- **Spec generada**: documento Markdown estructurado con 6 secciones fijas
+  que el agente produce como output a partir del requerimiento.
+- **Supuesto**: decisión de diseño que el agente toma ante información
+  ambigua o ausente, marcada explícitamente con el prefijo `[SUPUESTO]`
+  en la spec generada y expuesta en el campo `assumptions` de la respuesta.
+- **Temperatura 0.3**: parámetro del LLM que produce output
+  semi-determinista — suficientemente creativo para interpretar texto libre,
+  suficientemente estable para evals con PromptFoo.
+- **PromptFoo**: herramienta de evaluación de prompts que verifica que la
+  misma entrada produzca estructuralmente el mismo output entre corridas.
 
 ## Objetivo
 Construir un agente (`spec_agent`) que reciba un requerimiento de
@@ -100,28 +117,84 @@ busca eliminar en el primer eslabón del flujo.
   - Producir las 6 secciones en el orden y nombres exactos definidos
     en el briefing.
 
-## Criterios de aceptación
-1. `POST /api/agents/spec/generate` con un requerimiento claro y
-   completo devuelve `200` con las 6 secciones presentes y no vacías.
-2. Dado un requerimiento ambiguo (ej. sin mencionar en qué capa del
-   sistema aplica), la respuesta incluye al menos un ítem en
-   `assumptions` y la sección correspondiente de la spec lo refleja.
-3. El archivo generado se persiste físicamente en `specs/` con
-   nombre único (no sobrescribe specs existentes).
-4. El endpoint responde en async — no bloquea el event loop de
-   FastAPI (verificable con type hints `async def` en toda la cadena
-   de llamada).
-5. Ninguna API key aparece hardcodeada — todas se leen desde
-   `Settings` (`shared/config.py`).
-6. El prompt es determinista lo suficiente para evals con PromptFoo:
-   misma entrada + misma temperatura (0.3) → salida estructuralmente
-   equivalente (mismas 6 secciones presentes) entre corridas.
-7. Errores del LLM (timeout, rate limit, respuesta malformada) no
-   crashean el proceso — devuelven un error HTTP claro (`[NEEDS
-   CLARIFICATION: el briefing no especifica el código de error ni el
-   comportamiento de retry; se asume 502 sin retry automático para
-   v1, ya que el retry es responsabilidad del Agente Orquestador según
-   specs/constitution/mission.md]`).
+## Requirements
+
+### Requisito 1: Generación de spec estructurada desde requerimiento
+
+**Historia:** Como agente orquestador quiero enviar un requerimiento en
+lenguaje natural al Spec Agent para obtener una spec técnica estructurada
+lista para ser consumida por el Agente Implementador.
+
+#### Criterios de aceptación
+
+1. CUANDO `POST /api/agents/spec/generate` recibe un requerimiento claro
+   y completo ENTONCES el sistema DEBERÁ retornar `200` con las 6
+   secciones presentes y no vacías en `spec_markdown`.
+
+2. CUANDO el requerimiento es ambiguo (ej. no menciona en qué capa del
+   sistema aplica) ENTONCES el sistema DEBERÁ incluir al menos un ítem
+   en `assumptions` y reflejarlo en la sección correspondiente de la
+   spec con el prefijo `[SUPUESTO]`, en lugar de inventar silenciosamente.
+
+3. El sistema DEBERÁ producir las 6 secciones en el orden y con los
+   nombres exactos definidos en el briefing: Objetivo, Alcance, Contexto
+   técnico, Diseño propuesto, Criterios de aceptación, Fuera de alcance.
+
+### Requisito 2: Persistencia del resultado
+
+**Historia:** Como desarrollador quiero que cada spec generada se
+guarde automáticamente en disco para poder consultarla y usarla como
+input del Implementador sin pasos manuales adicionales.
+
+#### Criterios de aceptación
+
+1. CUANDO el endpoint genera una spec exitosamente ENTONCES el sistema
+   DEBERÁ persistir el archivo en `specs/` con nombre único siguiendo
+   la convención `specs/0N-{area-o-generico}-{slug-requerimiento}.md`.
+
+2. El sistema DEBERÁ garantizar que cada archivo generado tenga un
+   nombre único — nunca sobrescribir una spec existente.
+
+3. CUANDO el archivo se persiste ENTONCES el sistema DEBERÁ retornar
+   en `file_path` la ruta relativa donde quedó guardado.
+
+### Requisito 3: Asincronía y conformidad técnica
+
+**Historia:** Como operador del sistema quiero que el Spec Agent no
+bloquee el event loop de FastAPI para que múltiples requests puedan
+procesarse concurrentemente.
+
+#### Criterios de aceptación
+
+1. El sistema DEBERÁ implementar el endpoint y toda la cadena de llamadas
+   internas con `async def` — nunca `def` síncrono en FastAPI.
+
+2. El sistema DEBERÁ leer `GROQ_API_KEY` exclusivamente desde `Settings`
+   (`shared/config.py`) — nunca hardcodeada en el código fuente.
+
+3. El sistema DEBERÁ mantener el prompt en `spec_agent/prompts.py` como
+   función parametrizada — nunca inline en el router o el servicio.
+
+### Requisito 4: Determinismo evaluable y resiliencia ante errores
+
+**Historia:** Como operador de calidad quiero poder evaluar el prompt
+con PromptFoo y confiar en que los errores del LLM no causen crashes
+para mantener el sistema estable en producción.
+
+#### Criterios de aceptación
+
+1. CUANDO la misma entrada se envía dos veces con temperatura 0.3
+   ENTONCES el sistema DEBERÁ producir salidas con las mismas 6
+   secciones presentes (estructura equivalente, evaluable con PromptFoo).
+
+2. SI la API de Groq retorna error (timeout, rate limit, respuesta
+   malformada) ENTONCES el sistema DEBERÁ retornar HTTP 502 sin
+   reintentos y sin crashear el proceso — el retry es responsabilidad
+   del Agente Orquestador.
+
+3. SI la respuesta del LLM no contiene alguna de las 6 secciones
+   requeridas ENTONCES el sistema DEBERÁ retornar HTTP 502 con mensaje
+   descriptivo, sin persistir el archivo parcial.
 
 ## Fuera de alcance
 - Integración real con el Agente Orquestador (se probará este agente
