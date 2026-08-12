@@ -1,8 +1,8 @@
 # Agente Implementador — Especificación Técnica
 
 > Generado a partir de `specs/features/002-impl-agent/briefing.md`.
-> `plan.md` y `tasks.md` generados. Pendiente de Gate 1 (revisión humana)
-> para resolver supuestos antes de tocar código de producción.
+> `plan.md` y `tasks.md` generados. Gate 1 (revisión humana) aprobado —
+> ver "Supuestos" al final para las decisiones tomadas.
 
 ## Glosario
 
@@ -88,20 +88,22 @@ código verificable.
 3. Determina `target_file`: usa el provisto o lo infiere de la spec.
 4. Verifica si el archivo de destino ya existe:
    - Si existe y `overwrite=False` → retorna error 409.
-   - Si existe y `overwrite=True` → procede.
+   - Si existe y `overwrite=True`:
+     - Si `target_file` está dentro de `src/agents/impl_agent/` → procede.
+     - Si `target_file` está fuera de `src/agents/impl_agent/` → retorna
+       error 403, aunque `overwrite=True` — requiere intervención manual.
 5. Arma el prompt con `impl_agent/prompts.py`, inyectando la spec
    completa y las convenciones del `CLAUDE.md`.
-6. Invoca a Groq (`llama-3.3-70b-versatile`, temperatura `[NEEDS
-   CLARIFICATION: más baja que 0.3 para mayor determinismo en código;
-   se propone 0.1]`) vía `langchain-groq`, de forma asíncrona.
+6. Invoca a Groq (`llama-3.3-70b-versatile`, temperatura `0.1`,
+   timeout `30s`) vía `langchain-groq`, de forma asíncrona.
 7. Extrae el bloque de código de la respuesta del LLM.
 8. Escribe el archivo en `target_file`.
 9. Devuelve `ImplResponse`.
 
-### Temperatura del LLM
-`[NEEDS CLARIFICATION: el briefing no define la temperatura exacta.
-Se propone 0.1 — mayor determinismo que specs en prosa (0.3) porque
-el código requiere sintaxis exacta. A confirmar en gate.]`
+### Temperatura y timeout del LLM
+Temperatura `0.1` — más determinismo que specs en prosa (0.3 del
+Spec Agent) porque el código requiere sintaxis exacta. Timeout `30s`,
+default de `langchain-groq`. Ambos aprobados en Gate 1.
 
 ## Requirements
 
@@ -160,12 +162,22 @@ código existente accidentalmente para evitar pérdida de trabajo.
    ENTONCES el sistema DEBERÁ retornar HTTP 409 con un mensaje que
    indique la ruta del archivo existente, sin modificar el archivo.
 
-2. CUANDO `target_file` ya existe en disco y `overwrite=True` ENTONCES
-   el sistema DEBERÁ sobrescribir el archivo y retornar `200`.
+2. CUANDO `target_file` ya existe en disco, `overwrite=True`, Y
+   `target_file` está dentro de `src/agents/impl_agent/` ENTONCES el
+   sistema DEBERÁ sobrescribir el archivo y retornar `200`.
 
-3. CUANDO `target_file` no existe ENTONCES el sistema DEBERÁ crear el
+3. CUANDO `target_file` ya existe en disco, `overwrite=True`, Y
+   `target_file` está fuera de `src/agents/impl_agent/` ENTONCES el
+   sistema DEBERÁ retornar HTTP 403 sin modificar el archivo — el
+   overwrite automático queda limitado a la carpeta propia del agente;
+   sobrescribir código de otras partes del repo requiere intervención
+   manual (regla de "ambigüedad — preguntar, nunca asumir" del
+   `CLAUDE.md`, aplicada a acciones difíciles de revertir).
+
+4. CUANDO `target_file` no existe ENTONCES el sistema DEBERÁ crear el
    archivo (incluyendo directorios intermedios si no existen) y
-   retornar `200`.
+   retornar `200`, sin importar si la ruta está dentro o fuera de
+   `impl_agent/`.
 
 ### Requisito 4: Resiliencia ante errores del LLM y el filesystem
 
@@ -215,12 +227,15 @@ archivo generado para poder auditar el proceso de generación.
 - Indexado del código generado en pgvector.
 - Diff o versionado entre generaciones del mismo archivo.
 
-## Supuestos — pendientes de resolución en Gate 1
+## Supuestos — aprobados en Gate 1
 
-Los siguientes puntos marcados `[NEEDS CLARIFICATION]` deben resolverse
-explícitamente en la revisión humana antes de generar `plan.md`:
-
-1. **Temperatura del LLM**: se propone `0.1` para mayor determinismo
-   en código. A confirmar o ajustar.
-2. **Timeout de Groq**: se propone `30s` (default de langchain-groq).
-   A confirmar si se necesita un valor más corto.
+1. **Temperatura del LLM**: `0.1`. Aprobado tal como propuesto.
+2. **Timeout de Groq**: `30s` (default de `langchain-groq`). Aprobado
+   tal como propuesto.
+3. **Overwrite restringido por carpeta** (no era `[NEEDS
+   CLARIFICATION]` en la spec original, pero se identificó como punto
+   crítico de seguridad en el gate): `overwrite=True` solo tiene efecto
+   si `target_file` está dentro de `src/agents/impl_agent/`. Fuera de
+   esa carpeta, retorna `403` aunque el flag esté en `True` —
+   coherente con la regla del `CLAUDE.md` de preguntar antes de
+   acciones difíciles de revertir. Ver Requisito 3.3.

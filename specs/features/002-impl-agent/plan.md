@@ -1,8 +1,7 @@
 # Agente Implementador — Plan de Implementación
 
 > Basado en `specs/features/002-impl-agent/spec.md`.
-> Pendiente de Gate 1 (revisión humana) antes de generar `tasks.md`
-> y de que se toque código de producción.
+> Gate 1 (revisión humana) aprobado — ver "Supuestos" al final.
 
 ## Resumen
 
@@ -23,8 +22,9 @@ archivo generado.
   expone `groq_api_key`, `llm_model`, `llm_temperature` — no requiere
   cambios.
 - **Temperatura**: `0.1` — aprobada en Gate 1 para mayor determinismo
-  en código vs. prosa (0.3 del Spec Agent). `[NEEDS CLARIFICATION:
-  pendiente de confirmación en gate]`
+  en código vs. prosa (0.3 del Spec Agent).
+- **Timeout de Groq**: `30s` (default de `langchain-groq`) — aprobado
+  en Gate 1.
 - **Patrón de referencia**: `spec_agent/` — misma estructura de módulos,
   mismas convenciones. No reinventar lo que ya funciona.
 - **Target**: `src/agents/impl_agent/` (carpeta vacía desde Fase 1).
@@ -72,6 +72,10 @@ tests/agents/
   - `write_file(path: str, content: str, overwrite: bool) -> None`:
     verifica existencia, crea directorios intermedios, escribe el archivo.
     Lanza `HTTPException(409)` si el archivo existe y `overwrite=False`.
+    Lanza `HTTPException(403)` si el archivo existe, `overwrite=True`,
+    y `path` está fuera de `src/agents/impl_agent/` (usar
+    `Path.resolve()` + comparación de ancestros, no comparación de
+    strings, para evitar bypass con `../`).
   - Manejo de errores: `HTTPException(404)` si `spec_path` no existe,
     `HTTPException(502)` si Groq falla o la respuesta no contiene código.
 - **`router.py`**: `POST /generate` que delega a `service.generate_code()`.
@@ -126,6 +130,14 @@ respuesta sin bloque de código), el sistema NUNCA escribe nada a disco
 y SIEMPRE retorna HTTP 502 con mensaje descriptivo.
 **Validates: Requisito 4.2, Requisito 4.3**
 
+### Property 7: Overwrite confinado a impl_agent/
+
+*Para cualquier* `target_file` que ya exista en disco y esté fuera de
+`src/agents/impl_agent/` (incluyendo intentos de escape con `../`),
+el sistema SIEMPRE retorna HTTP 403 y NUNCA modifica el archivo,
+sin importar el valor de `overwrite`.
+**Validates: Requisito 3.3**
+
 ## Riesgos y mitigaciones
 
 - **Extracción del bloque de código de la respuesta del LLM**: el LLM
@@ -143,6 +155,11 @@ y SIEMPRE retorna HTTP 502 con mensaje descriptivo.
   simultáneos con el mismo `target_file` y `overwrite=True` pueden
   producir race condition. Fuera de alcance en v1 (single-user, uso
   interno) — documentado como limitación conocida.
+- **Bypass de la restricción de carpeta con rutas relativas (`../`)**:
+  un `target_file` como `../spec_agent/service.py` podría escapar de
+  `impl_agent/` si se compara por string en vez de por path resuelto.
+  Mitigación: `write_file()` usa `Path.resolve()` y verifica que
+  `impl_agent/` sea un ancestro real de la ruta resuelta (Property 7).
 
 ## Pasos de implementación (alto nivel — el desglose fino va en tasks.md)
 
@@ -159,7 +176,11 @@ y SIEMPRE retorna HTTP 502 con mensaje descriptivo.
 7. Validación manual: request real con `spec.md` del `001-spec-agent`
    como input, verificar archivo generado en disco.
 
-## Supuestos — pendientes de resolución en Gate 1
+## Supuestos — aprobados en Gate 1
 
-1. **Temperatura del LLM**: `0.1` propuesto. A confirmar.
-2. **Timeout de Groq**: `30s` (default de langchain-groq). A confirmar.
+1. **Temperatura del LLM**: `0.1`. Aprobado tal como propuesto.
+2. **Timeout de Groq**: `30s` (default de `langchain-groq`). Aprobado
+   tal como propuesto.
+3. **Overwrite restringido a `impl_agent/`**: identificado en el gate
+   como necesario por seguridad (evitar sobrescritura automática de
+   código de producción existente). Agrega Requisito 3.3 y Property 7.

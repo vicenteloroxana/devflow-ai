@@ -1,0 +1,70 @@
+description: "Evals del prompt del Agente Implementador — valida estructura del código generado"
+
+prompts:
+  - "{{spec_content}}"
+
+providers:
+  - id: "file://provider_impl.py"
+    label: "impl-agent-groq"
+    config:
+      pythonExecutable: "../../../src/agents/.venv/Scripts/python.exe"
+
+defaultTest:
+  assert:
+    - type: contains
+      value: "```python"
+
+tests:
+  - description: "Spec clara — genera código con un solo bloque"
+    vars:
+      spec_content: |
+        # Spec: función de saludo
+
+        ## Contexto técnico
+        Ubicación: `impl_agent/saludo.py`
+
+        ## Diseño propuesto
+        Una función `saludar(nombre: str) -> str` que devuelve un
+        saludo personalizado.
+
+        ## Criterios de aceptación
+        - `saludar("Ana")` devuelve `"Hola, Ana!"`
+    assert:
+      - type: contains
+        value: "def saludar"
+      - type: contains
+        value: "->"
+
+  - description: "Spec pide convención de type hints y docstrings — el código las respeta"
+    vars:
+      spec_content: |
+        # Spec: validador de email
+
+        ## Contexto técnico
+        Ubicación: `impl_agent/validador.py`
+
+        ## Diseño propuesto
+        Una función que valida si un string es un email con formato básico
+        (contiene @ y un dominio).
+
+        ## Criterios de aceptación
+        - Devuelve `True`/`False` según si el formato es válido.
+    assert:
+      - type: contains
+        value: "def "
+      - type: contains
+        value: '"""'
+
+  - description: "Spec ambigua — el agente marca SUPUESTO en vez de inventar"
+    vars:
+      spec_content: |
+        # Spec: procesador de datos
+
+        ## Contexto técnico
+        Ubicación: `impl_agent/procesador.py`
+
+        ## Diseño propuesto
+        Procesa los datos según lo que haga falta.
+    assert:
+      - type: contains
+        value: "SUPUESTO"
