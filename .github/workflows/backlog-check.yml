@@ -1,0 +1,58 @@
+name: Backlog sync
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  backlog-sync:
+    name: Backlog — verificar que esté actualizado
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Necesita la historia para poder diffear contra la base del PR.
+          fetch-depth: 0
+
+      - name: Verificar backlog actualizado
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+
+          # Solo exige backlog actualizado si el PR crea/modifica documentos
+          # de una feature bajo specs/features/00N-nombre/. Un PR que solo
+          # toca código, docs o constitution no necesita tocar el backlog.
+          features=$(echo "$changed" | grep -E '^specs/features/[0-9]{3}-[^/]+/' || true)
+
+          if [ -z "$features" ]; then
+            echo "✅ El PR no toca documentos de features — backlog no aplica."
+            exit 0
+          fi
+
+          echo "El PR toca documentos de estas features:"
+          echo "$features" | sed -E 's|^(specs/features/[0-9]{3}-[^/]+)/.*|  - \1|' | sort -u
+
+          if echo "$changed" | grep -qx 'specs/features/backlog.md'; then
+            echo "✅ backlog.md fue actualizado en este PR."
+            exit 0
+          fi
+
+          echo ""
+          echo "❌ Este PR modifica documentos de una feature pero no actualiza"
+          echo "   specs/features/backlog.md."
+          echo ""
+          echo "   Según specs/constitution/workflow.md, al completar una feature hay"
+          echo "   que marcar su línea como [x] y linkear su carpeta:"
+          echo ""
+          echo "     - [x] 00N — Nombre → [00N-slug](00N-slug/)"
+          echo ""
+          echo "   Si este PR es trabajo en progreso de una feature que todavía no"
+          echo "   está terminada (ej. solo el briefing o la spec, antes del Gate 1),"
+          echo "   agregá su línea al backlog sin marcar:"
+          echo ""
+          echo "     - [ ] 00N — Nombre"
+          exit 1

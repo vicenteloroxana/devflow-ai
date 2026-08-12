@@ -143,7 +143,24 @@ Abrir PR → CI verde (ambos tipos de tests) → merge
 ## Después de los gates
 Con ambos gates pasados: correr tests → correr evals del prompt (si
 el agente usa LLM) → verificar el endpoint contra el servicio real →
-abrir PR → CI verde → merge.
+abrir PR → CI verde → merge → **actualizar el backlog**.
+
+### Actualizar el backlog (último paso, no opcional)
+Al mergear el PR de una feature, marcar su línea en
+[`../features/backlog.md`](../features/backlog.md) como `[x]` y linkear
+la carpeta de la feature:
+
+```
+- [x] 002 — Agente Implementador → [002-impl-agent](002-impl-agent/)
+```
+
+El backlog es la única vista de "qué está construido y qué falta" del
+proyecto. Si no se marca, queda desincronizado y deja de ser confiable
+para decidir qué sigue.
+
+Este paso es manual por ahora. El CI valida que no se olvide: un PR que
+toca `specs/features/00N-*/` sin actualizar `backlog.md` falla el check
+`backlog-sync` (ver `.github/workflows/backlog-check.yml`).
 
 ## Por qué existe este documento
 Sin este archivo, el proceso de 10 pasos solo vivía en el historial de
