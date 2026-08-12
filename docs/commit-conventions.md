@@ -2,6 +2,11 @@
 
 > Referencia independiente basada en la especificación oficial:
 > https://www.conventionalcommits.org/en/v1.0.0/
+>
+> Para nombres de **rama**, ver [`branch-conventions.md`](branch-conventions.md).
+> Los tipos de rama son un conjunto más chico que los de commit: `docs`,
+> `refactor`, `test`, `ci`, `build`, `style` y `perf` existen como tipo de
+> commit pero no de rama (van bajo `chore/`).
 
 ## Por qué existen estas convenciones
 
