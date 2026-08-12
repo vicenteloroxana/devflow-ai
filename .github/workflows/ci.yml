@@ -53,7 +53,7 @@ jobs:
         working-directory: .
         env:
           GROQ_API_KEY: "test-key-ci"
-        run: pytest tests/agents/test_spec_agent.py -v
+        run: pytest tests/agents/test_spec_agent.py tests/agents/test_impl_agent.py -v
 
       - name: Smoke test — app imports and starts
         env:
