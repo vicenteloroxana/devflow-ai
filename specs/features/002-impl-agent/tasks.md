@@ -1,7 +1,8 @@
 # Agente Implementador — Tasks
 
 > Desglose ejecutable de `specs/features/002-impl-agent/plan.md`.
-> Requiere Gate 1 aprobado antes de tocar código de producción.
+> Gate 1 aprobado — decisiones: temperatura 0.1, timeout 30s, overwrite
+> restringido a `src/agents/impl_agent/` (403 fuera de esa carpeta).
 > Tareas `[P]` son paralelizables entre sí (tocan archivos distintos).
 > Tests se escriben ANTES que la implementación y DEBEN fallar primero.
 
@@ -33,13 +34,19 @@
         sin modificar.
         _Valida: Requisito 3.1, Property 2_
 
-  - [ ] T3d. Archivo existente + `overwrite=True` → HTTP 200, archivo
-        reemplazado.
+  - [ ] T3d. Archivo existente dentro de `impl_agent/` + `overwrite=True`
+        → HTTP 200, archivo reemplazado.
         _Valida: Requisito 3.2_
 
+  - [ ] T3d2. Archivo existente FUERA de `impl_agent/` + `overwrite=True`
+        → HTTP 403, archivo sin modificar (probar también con
+        `target_file` conteniendo `../` para confirmar que no hay bypass).
+        _Valida: Requisito 3.3, Property 7_
+
   - [ ] T3e. `target_file` inexistente → archivo creado incluyendo
-        directorios intermedios.
-        _Valida: Requisito 3.3, Property 3_
+        directorios intermedios, sin importar si la ruta está dentro o
+        fuera de `impl_agent/`.
+        _Valida: Requisito 3.4, Property 3_
 
   - [ ] T3f. `spec_path` inexistente → HTTP 404 sin invocar al LLM
         (mock del LLM no debe ser llamado).
@@ -72,6 +79,10 @@
         - `@given(code=st.text(min_size=1))` → contenido escrito en disco
           es exactamente igual a `ImplResponse.code`.
           _Valida: Property 3_
+        - `@given(target_file=st.sampled_from(["../x.py", "/etc/passwd",
+          "src/agents/spec_agent/service.py", "../../CLAUDE.md"]))` con
+          `overwrite=True` → siempre → 403, archivo original intacto.
+          _Valida: Property 7_
 
 ## Fase 3 — Implementación [P]
 
@@ -87,7 +98,11 @@
       - `write_file(path: str, content: str, overwrite: bool) -> None`
         — verifica existencia, crea directorios intermedios, escribe.
         `HTTPException(409)` si existe y `overwrite=False`.
-        _Valida: Requisitos 3.1, 3.2, 3.3 — Properties 2, 3_
+        `HTTPException(403)` si existe, `overwrite=True`, y la ruta
+        resuelta (`Path.resolve()`) no tiene a `impl_agent/` como
+        ancestro — comparar paths resueltos, no strings, para que
+        `../` no sea un bypass.
+        _Valida: Requisitos 3.1, 3.2, 3.3, 3.4 — Properties 2, 3, 7_
       - `generate_code(request: ImplRequest) -> ImplResponse` — orquesta
         lectura → inferencia → prompt → Groq → extracción → escritura.
         `HTTPException(404)` si `spec_path` no existe.
@@ -133,5 +148,6 @@ El CHECKPOINT debe estar en verde antes de T6.
 - La validación manual (T8) confirma un archivo real generado en disco
   vía request HTTP contra el contenedor Docker.
 - No quedan `TODO`/`FIXME` en el código nuevo.
-- Todos los supuestos de `plan.md` están resueltos en Gate 1.
+- Property 7 (overwrite confinado a `impl_agent/`) verificada con
+  hypothesis, incluyendo casos de bypass con `../`.
 - Continúa con Gate 2 (revisión de seguridad y correctitud del código).
