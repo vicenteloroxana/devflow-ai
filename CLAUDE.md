@@ -43,6 +43,26 @@ devflow-ai/
 └── tests/
 ├── DevFlowAI.Tests/ ← xUnit
 └── agents/ ← pytest + promptfoo
+
+## Git — nunca commitear directo a main
+- `main` está protegida en GitHub (branch protection, aplica también a
+  admins): NO acepta push directo. Todo cambio va por rama + PR.
+- Antes de escribir el primer archivo de un cambio: crear la rama, según
+  `docs/branch-conventions.md` (estándar Conventional Branch v1.1.0).
+  Formato `<tipo>/<descripción-en-minúsculas-con-guiones>`.
+  Tipos de rama válidos (conjunto cerrado): `feature`/`feat`,
+  `bugfix`/`fix`, `hotfix`, `release`, `chore`.
+  OJO: `docs`, `refactor`, `test`, `ci` son tipos de COMMIT pero NO de
+  rama — esos cambios van en `chore/`. Ej: rama `chore/adr-iniciales`
+  con commits `docs(constitution): ...`.
+- Flujo: crear rama → commitear → push de la rama → abrir PR → merge.
+  Con 0 aprobaciones requeridas, el PR se puede mergear sin esperar a
+  nadie, pero el PR es obligatorio: es el registro de qué entró y por qué.
+- Mensajes de commit según `docs/commit-conventions.md`
+  (Conventional Commits).
+- Si por error ya hay cambios sin commitear sobre `main`: crear la rama
+  primero y commitear ahí — nunca commitear en `main` "y después mover".
+
 ## Ambigüedad — preguntar, nunca asumir
 - Ante un requerimiento ambiguo, incompleto o con más de una
   interpretación razonable: PREGUNTAR antes de actuar. No resolver la
